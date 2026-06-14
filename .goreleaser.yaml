@@ -1,0 +1,41 @@
+version: 2
+
+builds:
+  - id: tailagent
+    main: ./cmd/tailagent
+    binary: tailagent
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - formats:
+      - tar.gz
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+
+brews:
+  - name: tailagent
+    homepage: https://github.com/kumagaias/tailagent
+    description: Local workspace for managing coding agents
+    license: MIT
+    repository:
+      owner: kumagaias
+      name: homebrew-tap
+    install: |
+      bin.install "tailagent"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/tailagent version")

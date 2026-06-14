@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tailagent mock v8</title>
+<style>
+:root{
+  --bg:#071020;--sidebar:#050b18;--panel:#0b1730;--panel2:#101f3e;--panel3:#14274b;
+  --line:#203964;--line2:#294a80;--text:#edf4ff;--muted:#8ca2c8;--muted2:#60769c;
+  --blue:#5d9cff;--green:#42d79a;--yellow:#f4c65d;--red:#ff7181;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;overflow:hidden;background:linear-gradient(140deg,#071020,#0b1730 62%,#10224a);color:var(--text);font-size:14px}
+button,select,input,textarea{font:inherit}
+.app{height:100vh;display:grid;grid-template-columns:250px 1fr}
+.sidebar{background:rgba(4,9,20,.92);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:12px;padding:4px 12px 22px}
+.logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#78b4ff,#7d83ff);display:grid;place-items:center;color:#071020;font-size:20px;font-weight:900}
+.brand strong{display:block;font-size:19px}.brand small{display:block;color:var(--muted);margin-top:2px}
+.nav{display:grid;gap:6px}
+.nav button{all:unset;cursor:pointer;padding:13px 14px;border-radius:11px;color:var(--muted);display:flex;align-items:center;gap:11px;font-size:15px}
+.nav button:before{content:"";width:9px;height:9px;border-radius:50%;background:#526b96}
+.nav button.active,.nav button:hover{background:rgba(47,111,237,.2);color:var(--text)}
+.nav button.active:before{background:var(--blue);box-shadow:0 0 14px rgba(93,156,255,.75)}
+.summary{margin-top:auto;border:1px solid var(--line);border-radius:14px;padding:14px;background:linear-gradient(180deg,rgba(20,39,75,.75),rgba(8,17,35,.8));color:var(--muted);line-height:1.55}
+.summary strong{display:block;color:var(--text);margin-bottom:6px}
+main{min-width:0;display:flex;flex-direction:column}
+.topbar{height:78px;flex:0 0 auto;border-bottom:1px solid var(--line);padding:0 28px;display:flex;align-items:center;justify-content:space-between;background:rgba(7,16,32,.82)}
+.head h1{margin:0 0 4px;font-size:25px}.head p{margin:0;color:var(--muted)}
+.actions{display:flex;align-items:center;gap:10px}
+select,input,textarea{background:#0d1b37;color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;outline:none}
+.actions select{min-width:170px}
+.btn{border:1px solid var(--line2);background:#12264b;color:var(--text);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#3476ef,#5a95ff);border-color:#68a0ff}
+.view{display:none;height:calc(100vh - 78px);overflow:hidden}
+.view.active{display:block}
+.empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--muted)}
+.empty-inner{display:grid;gap:14px;justify-items:center}
+.empty-icon{width:64px;height:64px;border-radius:18px;border:1px solid var(--line2);background:#0f203f;display:grid;place-items:center;font-size:28px;color:var(--blue)}
+.list-layout{height:100%;position:relative}
+.list-layout.open{grid-template-columns:none}
+.content{height:100%;padding:26px 28px;overflow:auto}
+.table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:rgba(8,18,38,.72)}
+.table th,.table td{text-align:left;padding:15px 16px;border-bottom:1px solid var(--line)}
+.table th{font-size:12px;color:var(--muted);background:#10203e}
+.table tr:last-child td{border-bottom:0}.table tbody tr{cursor:pointer}.table tbody tr:hover{background:rgba(62,116,218,.11)}
+.table b{font-size:15px}
+.row-actions{display:flex;gap:8px;justify-content:flex-end;opacity:0}.table tbody tr:hover .row-actions{opacity:1}
+.icon-btn{width:32px;height:32px;border:1px solid var(--line2);border-radius:9px;background:#112448;color:var(--text);cursor:pointer;display:grid;place-items:center}
+.badge{display:inline-flex;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:4px 8px;font-size:12px;color:var(--muted)}
+.badge.ok{color:var(--green)}.badge.run{color:var(--yellow)}
+.drawer{
+  position:absolute;
+  top:0;
+  right:0;
+  width:520px;
+  height:100%;
+  z-index:20;
+  border-left:1px solid var(--line);
+  background:rgba(5,11,24,.98);
+  overflow:hidden;
+  opacity:0;
+  pointer-events:none;
+  transform:translateX(18px);
+  transition:opacity .15s ease,transform .15s ease;
+  box-shadow:-22px 0 50px rgba(0,0,0,.35)
+}
+.list-layout.open .drawer,.board-wrap.open .drawer{
+  opacity:1;
+  pointer-events:auto;
+  transform:translateX(0)
+}
+.drawer-head{padding:21px 22px;border-bottom:1px solid var(--line);position:relative}
+.drawer-head h2{margin:0 42px 7px 0;font-size:20px}.drawer-head p{margin:0;color:var(--muted)}
+.close{all:unset;position:absolute;right:16px;top:16px;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.close:hover{background:#112448;color:var(--text)}
+.drawer-body{height:calc(100% - 86px);overflow:auto;padding:20px 22px}
+.section{padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.section h3{margin:0 0 11px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2)}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:10px;margin:10px 0}.kv span{color:var(--muted)}
+.field{margin:12px 0}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}.field input,.field select,.field textarea{width:100%}
+textarea{min-height:130px;resize:vertical;line-height:1.5}
+.view-only{}.edit-only{display:none}.editing .edit-only{display:block}.editing .view-only{display:none}
+.drawer-actions{display:flex;gap:8px;margin-top:12px}.note{color:var(--muted);font-size:12px;line-height:1.55}
+.board-wrap{height:100%;position:relative}.board-wrap.open{grid-template-columns:none}
+.board{padding:22px;overflow:auto}.columns{display:grid;grid-template-columns:repeat(4,minmax(230px,1fr));gap:14px;min-width:960px}
+.col{border:1px solid var(--line);border-radius:15px;background:rgba(7,18,38,.68);padding:10px;min-height:calc(100vh - 126px)}
+.colhead{display:flex;justify-content:space-between;align-items:center;padding:7px 6px 12px;font-weight:800}
+.count{border:1px solid var(--line);background:#112448;color:var(--muted);border-radius:999px;padding:2px 7px;font-size:12px}
+.card{border:1px solid #294978;border-radius:12px;background:linear-gradient(180deg,rgba(21,43,82,.95),rgba(12,27,54,.95));padding:13px;margin:8px 0;cursor:pointer}
+.card:hover,.card.active{border-color:var(--blue)}.meta{display:flex;justify-content:space-between;margin-top:10px;color:var(--muted);font-size:11px}
+.traces{height:100%;display:grid;grid-template-columns:270px 1fr}.filters{border-right:1px solid var(--line);background:rgba(5,11,24,.62);padding:18px;overflow:auto}
+.filters h3{margin:0 0 14px;font-size:13px}.filter-group{margin-bottom:20px}.filter-group label{display:block;color:var(--muted);font-size:12px;margin-bottom:7px}.filter-group input,.filter-group select{width:100%}
+.check{display:flex;gap:8px;align-items:center;color:var(--muted);margin:8px 0}.trace-main{padding:18px 22px;overflow:auto}
+.chart{height:180px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(17,35,69,.9),rgba(7,18,37,.9));padding:12px;margin-bottom:16px}.chart svg{width:100%;height:100%}
+.gridline{stroke:#20385f;stroke-width:1}.line{fill:none;stroke:#69a5ff;stroke-width:3}.area{fill:url(#fill)}
+.logs{border:1px solid var(--line);border-radius:14px;overflow:hidden}.logrow{display:grid;grid-template-columns:92px 100px 120px 1fr 90px;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);align-items:center}
+.logrow.header{background:#10203e;color:var(--muted);font-size:12px;font-weight:700}
+.status{font-weight:800}.status.error{color:var(--red)}.status.success{color:var(--green)}.status.running{color:var(--yellow)}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="logo">t</div><div><strong>tailagent</strong><small>local agent workspace</small></div></div>
+  <nav class="nav">
+    <button class="active" data-view="agents">Agents</button>
+    <button data-view="projects">Projects</button>
+    <button data-view="milestones">Milestones</button>
+    <button data-view="tasks">Tasks</button>
+    <button data-view="approvals">Approvals</button>
+    <button data-view="traces">Traces</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+  <div class="summary"><strong>tailagent</strong><span id="summaryText">No agents · No projects<br>0 approvals pending</span></div>
+</aside>
+
+<main>
+<header class="topbar"><div class="head"><h1 id="pageTitle">Agents</h1><p id="pageSubtitle">Manage local coding agents.</p></div><div class="actions" id="headerActions"></div></header>
+
+<section id="agents" class="view active">
+<div class="list-layout" id="agentsLayout">
+  <div id="agentsMain" class="content"></div>
+  <aside class="drawer" id="agentDrawer">
+    <div class="drawer-head"><button class="close">✕</button><h2 id="agentDrawerTitle">Agent</h2><p>Configure a local coding agent.</p></div>
+    <div class="drawer-body">
+      <div class="section">
+        <div class="view-only">
+          <div class="kv"><span>Type</span><b id="agentTypeView">Codex</b></div>
+          <div class="kv"><span>Instruction</span><b id="agentInstructionView">Use this agent for implementation tasks.</b></div>
+        </div>
+        <div class="edit-only">
+          <div class="field"><label>Agent type</label><select id="agentTypeEdit"><option>Codex</option><option>Claude</option><option>Kiro</option></select></div>
+          <div class="field"><label>Instruction</label><textarea id="agentInstructionEdit"></textarea></div>
+          <p class="note">Command and approval bridge are configured internally for each supported agent.</p>
+        </div>
+        <div class="drawer-actions"><button class="btn" id="agentEditBtn">Edit</button><button class="btn primary edit-only" id="agentSaveBtn">Save</button></div>
+      </div>
+    </div>
+  </aside>
+</div>
+</section>
+
+<section id="projects" class="view">
+<div class="list-layout" id="projectsLayout">
+  <div id="projectsMain" class="content"></div>
+  <aside class="drawer" id="projectDrawer">
+    <div class="drawer-head"><button class="close">✕</button><h2 id="projectDrawerTitle">Project</h2><p>Import an existing local folder.</p></div>
+    <div class="drawer-body"><div class="section">
+      <div class="view-only"><div class="kv"><span>Name</span><b id="projectNameView"></b></div><div class="kv"><span>Folder</span><b id="projectFolderView"></b></div><div class="kv"><span>Default milestone</span><b>None</b></div></div>
+      <div class="edit-only">
+        <div class="field"><label>Local folder</label><div style="display:flex;gap:8px"><input id="projectFolderEdit"><button class="btn">Browse</button></div></div>
+        <div class="field"><label>Project name</label><input id="projectNameEdit"></div>
+        <p class="note">The folder name is used as the default project name. A hidden milestone named None is created automatically.</p>
+      </div>
+      <div class="drawer-actions"><button class="btn" id="projectEditBtn">Edit</button><button class="btn primary edit-only" id="projectSaveBtn">Save</button></div>
+    </div></div>
+  </aside>
+</div>
+</section>
+
+<section id="milestones" class="view"><div class="content"><div class="empty"><div class="empty-inner"><div class="empty-icon">◆</div><div>No milestones yet</div></div></div></div></section>
+
+<section id="tasks" class="view"><div class="content"><div class="empty"><div class="empty-inner"><div class="empty-icon">☷</div><div>No tasks yet</div></div></div></div></section>
+
+<section id="approvals" class="view"><div class="content"><div class="empty"><div class="empty-inner"><div class="empty-icon">✓</div><div>No pending approvals</div></div></div></div></section>
+
+<section id="traces" class="view">
+<div class="traces">
+<aside class="filters">
+  <h3>Filter traces</h3>
+  <div class="filter-group"><label>Search</label><input value="service:tailagent"></div>
+  <div class="filter-group"><label>Project</label><select><option>All projects</option></select></div>
+  <div class="filter-group"><label>Agent</label><select><option>All agents</option><option>Claude</option><option>Codex</option><option>Kiro</option></select></div>
+  <div class="filter-group"><label>Status</label><div class="check"><input type="checkbox" checked> Error</div><div class="check"><input type="checkbox" checked> Running</div><div class="check"><input type="checkbox" checked> Success</div></div>
+</aside>
+<div class="trace-main">
+  <div class="chart"><svg viewBox="0 0 900 150" preserveAspectRatio="none"><defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#69a5ff" stop-opacity=".35"/><stop offset="100%" stop-color="#69a5ff" stop-opacity="0"/></linearGradient></defs><line class="gridline" x1="0" y1="25" x2="900" y2="25"/><line class="gridline" x1="0" y1="75" x2="900" y2="75"/><line class="gridline" x1="0" y1="125" x2="900" y2="125"/><path class="area" d="M0 125 L0 112 L60 108 L120 91 L180 100 L240 62 L300 78 L360 48 L420 83 L480 58 L540 67 L600 39 L660 54 L720 29 L780 62 L840 44 L900 52 L900 125 Z"/><path class="line" d="M0 112 L60 108 L120 91 L180 100 L240 62 L300 78 L360 48 L420 83 L480 58 L540 67 L600 39 L660 54 L720 29 L780 62 L840 44 L900 52"/></svg></div>
+  <div class="logs"><div class="logrow header"><div>Time</div><div>Status</div><div>Agent</div><div>Message</div><div>Duration</div></div><div class="logrow"><div>—</div><div>—</div><div>—</div><div>No traces yet</div><div>—</div></div></div>
+</div>
+</div>
+</section>
+
+<section id="settings" class="view"><div class="content"><div class="empty"><div class="empty-inner"><div class="empty-icon">⚙</div><div>Settings</div></div></div></div></section>
+</main>
+</div>
+
+<script>
+const state={agents:[],projects:[]};
+const titles={
+ agents:['Agents','Manage local coding agents.'],
+ projects:['Projects','Import and manage local project folders.'],
+ milestones:['Milestones','Optional grouping for project tasks.'],
+ tasks:['Tasks','Move tasks to coordinate local agents.'],
+ approvals:['Approvals','Review permission requests from agents.'],
+ traces:['Traces','Inspect agent runs and approval events.'],
+ settings:['Settings','Required local configuration only.']
+};
+const views=[...document.querySelectorAll('.view')],nav=[...document.querySelectorAll('.nav button')];
+const pageTitle=document.getElementById('pageTitle'),pageSubtitle=document.getElementById('pageSubtitle'),headerActions=document.getElementById('headerActions');
+
+function setEditing(drawer,on){drawer.classList.toggle('editing',on)}
+function closeAll(){document.querySelectorAll('.list-layout').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.drawer').forEach(d=>d.classList.remove('editing'))}
+document.querySelectorAll('.close').forEach(b=>b.onclick=closeAll);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll()});
+
+function renderHeader(view){
+ pageTitle.textContent=titles[view][0];pageSubtitle.textContent=titles[view][1];
+ if(view==='agents')headerActions.innerHTML='<button class="btn primary" id="addAgent">+ Agent</button>';
+ else if(view==='projects')headerActions.innerHTML='<button class="btn primary" id="addProject">+ Project</button>';
+ else if(view==='traces')headerActions.innerHTML='<select><option>Live</option><option>5 mins</option><option>30 mins</option><option>1 hour</option><option>6 hours</option><option>1 day</option><option>2 days</option><option>1 week</option></select><button class="btn">Refresh</button>';
+ else headerActions.innerHTML='';
+ if(view==='agents')document.getElementById('addAgent').onclick=()=>openAgent(null,true);
+ if(view==='projects')document.getElementById('addProject').onclick=()=>openProject(null,true);
+}
+function setView(view){
+ views.forEach(v=>v.classList.remove('active'));document.getElementById(view).classList.add('active');
+ nav.forEach(b=>b.classList.toggle('active',b.dataset.view===view));closeAll();renderHeader(view)
+}
+nav.forEach(b=>b.onclick=()=>setView(b.dataset.view));
+
+function renderAgents(){
+ const el=document.getElementById('agentsMain');
+ if(!state.agents.length){
+   el.innerHTML='<div class="empty"><div class="empty-inner"><div class="empty-icon">A</div><div>No agents configured</div><button class="btn primary" id="emptyAddAgent">+ Agent</button></div></div>';
+   document.getElementById('emptyAddAgent').onclick=()=>openAgent(null,true);return;
+ }
+ el.innerHTML=`<table class="table"><thead><tr><th>Agent</th><th>Instruction</th><th></th></tr></thead><tbody>${state.agents.map((a,i)=>`<tr data-i="${i}"><td><b>${a.type}</b></td><td>${a.instruction}</td><td><div class="row-actions"><button class="icon-btn edit-row">✎</button></div></td></tr>`).join('')}</tbody></table>`;
+ el.querySelectorAll('tbody tr').forEach(row=>{
+   row.onclick=e=>{if(e.target.closest('button'))return; if(agentsLayout.classList.contains('open')){closeAll();return;} openAgent(+row.dataset.i,false)};
+   row.querySelector('.edit-row').onclick=e=>{e.stopPropagation();openAgent(+row.dataset.i,false);setEditing(agentDrawer,true)}
+ });
+}
+function openAgent(index,isNew){
+ agentsLayout.classList.add('open');const a=isNew?{type:'Codex',instruction:''}:state.agents[index];
+ agentDrawer.dataset.index=isNew?'':index;agentDrawerTitle.textContent=isNew?'Add agent':a.type;
+ agentTypeView.textContent=a.type;agentInstructionView.textContent=a.instruction||'—';
+ agentTypeEdit.value=a.type;agentInstructionEdit.value=a.instruction;setEditing(agentDrawer,isNew)
+}
+agentEditBtn.onclick=()=>setEditing(agentDrawer,true);
+agentSaveBtn.onclick=()=>{
+ const obj={type:agentTypeEdit.value,instruction:agentInstructionEdit.value||'Use this agent for project tasks.'};
+ const idx=agentDrawer.dataset.index;
+ if(idx==='')state.agents.push(obj);else state.agents[+idx]=obj;
+ setEditing(agentDrawer,false);renderAgents();updateSummary()
+};
+
+function renderProjects(){
+ const el=document.getElementById('projectsMain');
+ if(!state.projects.length){
+   el.innerHTML='<div class="empty"><div class="empty-inner"><div class="empty-icon">P</div><div>No projects imported</div><button class="btn primary" id="emptyAddProject">+ Project</button></div></div>';
+   document.getElementById('emptyAddProject').onclick=()=>openProject(null,true);return;
+ }
+ el.innerHTML=`<table class="table"><thead><tr><th>Project</th><th>Folder</th><th>Milestones</th><th>Tasks</th><th></th></tr></thead><tbody>${state.projects.map((p,i)=>`<tr data-i="${i}"><td><b>${p.name}</b></td><td>${p.folder}</td><td>1</td><td>0</td><td><div class="row-actions"><button class="icon-btn goto-ms">◆</button><button class="icon-btn goto-tasks">☷</button><button class="icon-btn edit-row">✎</button></div></td></tr>`).join('')}</tbody></table>`;
+ el.querySelectorAll('tbody tr').forEach(row=>{
+   const i=+row.dataset.i;
+   row.onclick=e=>{if(e.target.closest('button'))return; if(projectsLayout.classList.contains('open')){closeAll();return;} openProject(i,false)};
+   row.querySelector('.edit-row').onclick=e=>{e.stopPropagation();openProject(i,false);setEditing(projectDrawer,true)};
+   row.querySelector('.goto-ms').onclick=e=>{e.stopPropagation();setView('milestones')};
+   row.querySelector('.goto-tasks').onclick=e=>{e.stopPropagation();setView('tasks')};
+ });
+}
+function openProject(index,isNew){
+ projectsLayout.classList.add('open');const p=isNew?{name:'',folder:''}:state.projects[index];
+ projectDrawer.dataset.index=isNew?'':index;projectDrawerTitle.textContent=isNew?'Import project':p.name;
+ projectNameView.textContent=p.name;projectFolderView.textContent=p.folder;projectNameEdit.value=p.name;projectFolderEdit.value=p.folder;setEditing(projectDrawer,isNew)
+}
+projectEditBtn.onclick=()=>setEditing(projectDrawer,true);
+projectSaveBtn.onclick=()=>{
+ const obj={name:projectNameEdit.value||'untitled-project',folder:projectFolderEdit.value||'/Users/aki/dev/untitled-project'};
+ const idx=projectDrawer.dataset.index;if(idx==='')state.projects.push(obj);else state.projects[+idx]=obj;
+ setEditing(projectDrawer,false);renderProjects();updateSummary()
+};
+projectFolderEdit.oninput=e=>{const parts=e.target.value.replace(/\/$/,'').split('/');projectNameEdit.value=parts[parts.length-1]||''};
+
+function updateSummary(){summaryText.innerHTML=`${state.agents.length} agents · ${state.projects.length} projects<br>0 approvals pending`}
+renderAgents();renderProjects();renderHeader('agents');updateSummary();
+</script>
+</body>
+</html>
