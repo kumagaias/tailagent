@@ -35,6 +35,7 @@ brews:
     repository:
       owner: kumagaias
       name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     install: |
       bin.install "tailagent"
     test: |
